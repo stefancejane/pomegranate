@@ -178,6 +178,7 @@ cdef class GeneralMixtureModel(BayesModel):
 		"""
 
 		initial_log_probability_sum = NEGINF
+		total_improvement = 0
 		iteration, improvement = 0, INF
 		n = len(X)
 
@@ -197,12 +198,20 @@ cdef class GeneralMixtureModel(BayesModel):
 				starts = starts[:-1]
 			ends = list(range(batch_size, n, batch_size)) + [n]
 
+		minibatching = batches_per_epoch is not None
 		batches_per_epoch = batches_per_epoch or len(starts)
 		n_seen_batches = 0
+		epoch_starts, epoch_ends = None, None
 
 		with Parallel(n_jobs=n_jobs, backend='threading') as parallel:
 			while improvement > stop_threshold and iteration < max_iterations + 1:
 				epoch_start_time = time.time()
+				self.from_summaries(inertia, pseudocount)
+
+				if epoch_starts is not None and minibatching:
+					updated_log_probability_sum = sum(self.log_probability(X[start:end]).sum() 
+						for start, end in zip(epoch_starts, epoch_ends))
+					improvement = updated_log_probability_sum - log_probability_sum
 
 				epoch_starts = starts[n_seen_batches:n_seen_batches+batches_per_epoch]
 				epoch_ends = ends[n_seen_batches:n_seen_batches+batches_per_epoch]
@@ -211,8 +220,6 @@ cdef class GeneralMixtureModel(BayesModel):
 				if n_seen_batches >= len(starts):
 					n_seen_batches = 0
 
-				self.from_summaries(inertia, pseudocount)
-
 				log_probability_sum = sum(parallel(delayed(self.summarize, 
 					check_pickle=False)(X[start:end], weights[start:end]) 
 					for start, end in zip(epoch_starts, epoch_ends)))
@@ -220,11 +227,15 @@ cdef class GeneralMixtureModel(BayesModel):
 				if iteration == 0:
 					initial_log_probability_sum = log_probability_sum
 				else:
-					improvement = log_probability_sum - last_log_probability_sum
 					time_spent = time.time() - epoch_start_time
+					if not minibatching:
+						improvement = log_probability_sum - last_log_probability_sum
+					
 					if verbose:
 						print("[{}] Improvement: {}\tTime (s): {:.4}".format(
 							iteration, improvement, time_spent))
+
+					total_improvement += improvement
 
 				iteration += 1
 				last_log_probability_sum = log_probability_sum
@@ -232,13 +243,12 @@ cdef class GeneralMixtureModel(BayesModel):
 		self.clear_summaries()
 
 		if verbose:
-			total_imp = last_log_probability_sum - initial_log_probability_sum
 			total_time_spent = time.time() - training_start_time
-			print("Total Improvement: {}".format(total_imp))
+			print("Total Improvement: {}".format(total_improvement))
 			print("Total Time (s): {:.4f}".format(total_time_spent))
 
-		return last_log_probability_sum - initial_log_probability_sum
-
+		return log_probability_sum - initial_log_probability_sum
+		
 	def summarize(self, X, weights=None):
 		"""Summarize a batch of data and store sufficient statistics.
 

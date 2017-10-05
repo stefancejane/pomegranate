@@ -538,6 +538,31 @@ cdef class Kmeans(Model):
 		return total_dist
 
 	def from_summaries(self, double inertia=0.0, clear_summaries=True):
+		"""Fit the model to the collected sufficient statistics.
+
+		Fit the parameters of the model to the sufficient statistics gathered
+		during the summarize calls. This should return an exact update.
+
+		Parameters
+		----------
+		inertia : double, optional
+			The weight of the previous parameters of the model. The new
+			parameters will roughly be
+			old_param*inertia + new_param*(1-inertia),
+			so an inertia of 0 means ignore the old parameters, whereas an
+			inertia of 1 means ignore the new parameters. Default is 0.0.
+
+		clear_summaries : boolean, optional
+			Whether to clear the stored summaries after updating the models
+			based on them. If set to False, this can be used for streaming
+			updates where one updates the parameters of the model while seeing
+			more data. Default is True.
+
+		Returns
+		-------
+		None
+		"""
+
 		cdef int l, j, k = self.k, d = self.d
 		cdef double w_sum = 0
 

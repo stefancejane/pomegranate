@@ -293,7 +293,7 @@ cdef class Kmeans(Model):
 
 	def fit(self, X, weights=None, inertia=0.0, stop_threshold=1e-3,
                 max_iterations=1e3, batch_size=None, batches_per_epoch=None,
-                clear_summaries='auto', verbose=False, n_jobs=1):
+                clear_summaries=False, verbose=False, n_jobs=1):
 		"""Fit the model to the data using k centroids.
 
 		Parameters
@@ -609,7 +609,7 @@ cdef class Kmeans(Model):
 	@classmethod
 	def from_samples(cls, k, X, weights=None, init='kmeans++', n_init=10, 
 		inertia=0.0, stop_threshold=0.1, max_iterations=1e3, batch_size=None, 
-		batches_per_epoch=None, clear_summaries='auto', verbose=False, n_jobs=1):
+		batches_per_epoch=None, clear_summaries=False, verbose=False, n_jobs=1):
 		"""
 		Fit a k-means object to the data directly.
 
